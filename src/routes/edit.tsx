@@ -2,7 +2,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Save, ArrowLeft, X, LayoutTemplate, ImagePlus, PenLine, Trash2, PanelLeftClose, PanelLeftOpen, Sun, Moon, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { STORAGE_KEY, type CameraSlot, FreeObject, Survey, StorageData } from "./surveys";
+import { type CameraSlot, FreeObject, Survey, StorageData } from "./surveys"; // <-- Removed STORAGE_KEY from here!
 
 // Lazy load the 3D scene to keep the main bundle light
 const ViewerScene = lazy(() =>
