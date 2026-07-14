@@ -2,7 +2,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Settings, X, FolderOpen, PanelLeftClose, PanelLeftOpen, Sun, Moon, PanelRightClose, PanelRightOpen, Cable } from "lucide-react";
-import type { CameraSlot, FreeObject, Survey, StorageData } from "./surveys";
+import { STORAGE_KEY, type CameraSlot, FreeObject, Survey, StorageData } from "./surveys";
 
 // Lazy loading the WebGL context
 const ViewerScene = lazy(() =>
@@ -12,8 +12,6 @@ const ViewerScene = lazy(() =>
 export const Route = createFileRoute("/")({
   component: ViewerPage,
 });
-
-const STORAGE_KEY = "tennis-surveys-v20";
 
 function ViewerPage() {
   const navigate = useNavigate();

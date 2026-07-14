@@ -81,7 +81,7 @@ const INITIAL_SLOTS: CameraSlot[] = [
 ];
 
 // The current database key. Bump this when data models change to avoid crashes.
-const STORAGE_KEY = "tennis-surveys-v20";
+export const STORAGE_KEY = "tennis-surveys-v20";
 
 function SurveysPage() {
   // --- STATE MANAGEMENT ---
