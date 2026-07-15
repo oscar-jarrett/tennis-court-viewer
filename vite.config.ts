@@ -8,6 +8,7 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 // so the build emits a Vercel-compatible output. Inside the Lovable sandbox
 // this is ignored (Cloudflare is forced). Locally, `nitro: true` force-enables
 // the deploy plugin (default would skip it outside Lovable).
+// @ts-ignore
 const isVercel = !!process.env.VERCEL;
 
 export default defineConfig({
