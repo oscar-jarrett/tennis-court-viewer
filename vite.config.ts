@@ -1,10 +1,11 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tsconfigPaths from "vite-tsconfig-paths";
+import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+
+// @ts-ignore
+const isVercel = !!process.env.VERCEL;
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
-  server: {
-    port: 8080,
+  tanstackStart: {
+    server: { entry: "server" },
   },
+  nitro: isVercel ? { preset: "vercel" } : true,
 });
