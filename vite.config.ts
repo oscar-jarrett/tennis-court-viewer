@@ -1,11 +1,9 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// @ts-ignore
-const isVercel = !!process.env.VERCEL;
-
 export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
-  nitro: isVercel ? { preset: "vercel" } : true,
+  // This forces the engine to export a pure, static HTML/JS site!
+  nitro: { preset: "static" }, 
 });
