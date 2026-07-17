@@ -1,7 +1,14 @@
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import tailwindcss from "@tailwindcss/vite";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  tanstackStart: {
-    ssr: false, // This is the correct way to disable SSR in Lovable's wrapper
-  },
+  plugins: [
+    TanStackRouterVite(),
+    tailwindcss(),
+    react(),
+    tsconfigPaths(),
+  ],
 });
