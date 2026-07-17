@@ -35,17 +35,8 @@ jobs:
       - name: Build Standalone Static Client Assets
         run: |
           npm run build
-          
-          # Automatically detect if the output is in dist or dist/client
-          if [ -d "dist/client" ]; then
-            echo "Found dist/client - copying fallback routing"
-            cp dist/client/index.html dist/client/404.html
-            echo "ARTIFACT_DIR=./dist/client" >> $GITHUB_ENV
-          else
-            echo "Found dist - copying fallback routing"
-            cp dist/index.html dist/404.html
-            echo "ARTIFACT_DIR=./dist" >> $GITHUB_ENV
-          fi
+          # Duplicate your index.html to 404.html to handle standard SPA routing
+          cp dist/index.html dist/404.html
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -53,8 +44,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Use the dynamic directory we just found!
-          path: ${{ env.ARTIFACT_DIR }}
+          path: './dist' # Standard Vite output folder!
 
       - name: Deploy Live Site
         id: deployment

@@ -1,7 +1,10 @@
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  vite: {
-    base: "/tennis-court-viewer/", // Prepends your GitHub repository subfolder path
-  }
+  base: "/tennis-court-viewer/", // GitHub Pages subfolder
+  resolve: {
+    alias: [
+      { find: '@', replacement: '/src' } // Keeps your @/ imports working!
+    ],
+  },
 });
