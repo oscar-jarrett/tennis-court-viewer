@@ -2,12 +2,16 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    prerender: {
-      routes: ["/"], // Generates a static index.html
-    },
+    // Explicitly forces TanStack Start to compile as a static SPA
+    spa: {
+      enabled: true,
+      prerender: {
+        enabled: true,
+      }
+    }
   },
   vite: {
-    base: "/tennis-court-viewer/", // Prepend GitHub subfolder path
+    base: "/tennis-court-viewer/", // Prepends GitHub repository subfolder path
   },
-  nitro: true // <-- MUST be active to output to .output/public!
+  nitro: true // Creates the output in .output/public
 });
