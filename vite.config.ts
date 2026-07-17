@@ -1,15 +1,16 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  // Tells TanStack Start to skip compiling Node server assets completely
-  // and run purely as a high-performance, client-side SPA
   tanstackStart: {
     spa: {
-      enabled: true,
+      enabled: true, // Compiles purely as a client-side Single Page App
+    },
+    prerender: {
+      enabled: false, // <-- Explicitly prevents the pipeline from trying to prerender "/"
     }
   },
   vite: {
-    base: "/tennis-court-viewer/", // Prepends GitHub repository subfolder path
+    base: "/tennis-court-viewer/", // Prepends your GitHub repo name
   },
-  nitro: true // Compiles cleanly straight into .output/public
+  nitro: true // Keeps the final compilation output targeted to .output/public
 });
