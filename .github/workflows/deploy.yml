@@ -34,8 +34,13 @@ jobs:
 
       - name: Build Standard SPA
         run: |
+          # 1. Create a physical mock file for Node.js async_hooks so Rollup doesn't crash
+          echo "export class AsyncLocalStorage { getStore() { return undefined; } run(store, cb) { return cb(); } }" > src/mock-async-hooks.js
+          
+          # 2. Run the Vite build
           npm run build
-          # Duplicate index.html to handle client-side routing
+          
+          # 3. Duplicate index.html to handle client-side routing
           cp dist/index.html dist/404.html
 
       - name: Setup Pages Infrastructure
@@ -44,7 +49,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist' # Uploading the clean, bundled assets!
+          path: './dist' 
 
       - name: Deploy Live Site
         id: deployment
