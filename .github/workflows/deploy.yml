@@ -38,7 +38,7 @@ jobs:
           echo "export class AsyncLocalStorage { getStore() { return undefined; } run(store, cb) { return cb(); } }" > src/mock-async-hooks.js
           
           # 2. Inject the correct CSS import directly into the React entry point!
-          echo 'import "../styles.css";' > temp_main.tsx
+          echo 'import "./styles.css";' > temp_main.tsx
           cat src/main.tsx >> temp_main.tsx
           mv temp_main.tsx src/main.tsx
           
