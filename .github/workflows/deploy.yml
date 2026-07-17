@@ -42,11 +42,11 @@ jobs:
           cat src/main.tsx >> temp_main.tsx
           mv temp_main.tsx src/main.tsx
           
-          # 3. Install the missing CSS processing dependencies!
-          npm install -D tailwindcss autoprefixer postcss
+          # 3. Install the NEW Tailwind PostCSS package
+          npm install -D tailwindcss @tailwindcss/postcss autoprefixer postcss
           
-          # 4. Create the missing PostCSS config so Vite compiles Tailwind!
-          echo "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };" > postcss.config.cjs
+          # 4. Create the updated PostCSS config!
+          echo "module.exports = { plugins: { '@tailwindcss/postcss': {}, autoprefixer: {} } };" > postcss.config.cjs
           
           # 5. Build the pure static client
           npm run build
