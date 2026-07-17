@@ -2,8 +2,9 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    server: { entry: "server" },
+    ssr: false, // This is the magic key! It completely disables Server-Side Rendering
   },
-  // This forces the engine to export a pure, static HTML/JS site!
-  nitro: { preset: "static" }, 
+  nitro: { 
+    preset: "static" 
+  },
 });
