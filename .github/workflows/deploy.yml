@@ -37,15 +37,18 @@ jobs:
           # 1. Create the physical mock file to prevent Rollup from crashing
           echo "export class AsyncLocalStorage { getStore() { return undefined; } run(store, cb) { return cb(); } }" > src/mock-async-hooks.js
           
-          # 2. Inject the correct CSS import directly into the React entry point!
+          # 2. Inject the CSS import directly into the React entry point
           echo 'import "./styles.css";' > temp_main.tsx
           cat src/main.tsx >> temp_main.tsx
           mv temp_main.tsx src/main.tsx
           
-          # 3. Build the pure static client (Tailwind will now process the CSS)
+          # 3. Create the missing PostCSS config so Vite compiles Tailwind!
+          echo "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };" > postcss.config.cjs
+          
+          # 4. Build the pure static client
           npm run build
           
-          # 4. Duplicate index.html to handle client-side SPA routing
+          # 5. Duplicate index.html to handle client-side SPA routing
           cp dist/index.html dist/404.html
 
       - name: Setup Pages Infrastructure
