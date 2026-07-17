@@ -33,17 +33,7 @@ jobs:
         run: npm install
 
       - name: Build Standalone Static Client Assets
-        run: |
-          npm run build
-          
-          # Dynamically detect output folder and inject SPA routing fallback
-          if [ -d "dist/client" ]; then
-            cp dist/client/index.html dist/client/404.html
-            echo "ARTIFACT_DIR=./dist/client" >> $GITHUB_ENV
-          else
-            cp dist/index.html dist/404.html
-            echo "ARTIFACT_DIR=./dist" >> $GITHUB_ENV
-          fi
+        run: npm run build
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -51,7 +41,8 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ env.ARTIFACT_DIR }}
+          # Nitro guarantees the static index.html is placed right here:
+          path: './.output/public' 
 
       - name: Deploy Live Site
         id: deployment

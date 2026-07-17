@@ -2,9 +2,12 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    ssr: false, // Safely strips Node.js dependencies and forces a client-only build
+    prerender: {
+      routes: ["/"], // Instructs the Nitro crawler to generate a physical index.html
+    },
   },
   vite: {
-    base: "/tennis-court-viewer/", // GitHub Pages subfolder
-  }
+    base: "/tennis-court-viewer/", // Prepends your GitHub repository subfolder path
+  },
+  nitro: true // Routes the final static client output to .output/public
 });
