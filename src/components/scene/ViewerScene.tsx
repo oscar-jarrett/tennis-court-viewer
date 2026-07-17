@@ -10,7 +10,8 @@ import type { CameraSlot, FreeObject } from "@/routes/surveys";
 // --- CUSTOM MODEL LOADER ---
 // A reusable component that takes a filename and loads the associated GLTF/GLB model from the /public/models/ folder.
 function CustomModel({ filename }: { filename: string }) {
-  const { scene } = useGLTF(`/models/${filename}`);
+  // ✅ Dynamically injects the base URL so models load correctly on both Localhost and GitHub Pages!
+  const { scene } = useGLTF(`${import.meta.env.BASE_URL}models/${filename}`);
   return <primitive object={scene.clone()} />;
 }
 
