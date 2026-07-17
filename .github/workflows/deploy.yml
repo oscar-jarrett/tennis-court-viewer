@@ -42,13 +42,16 @@ jobs:
           cat src/main.tsx >> temp_main.tsx
           mv temp_main.tsx src/main.tsx
           
-          # 3. Create the missing PostCSS config so Vite compiles Tailwind!
+          # 3. Install the missing CSS processing dependencies!
+          npm install -D tailwindcss autoprefixer postcss
+          
+          # 4. Create the missing PostCSS config so Vite compiles Tailwind!
           echo "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };" > postcss.config.cjs
           
-          # 4. Build the pure static client
+          # 5. Build the pure static client
           npm run build
           
-          # 5. Duplicate index.html to handle client-side SPA routing
+          # 6. Duplicate index.html to handle client-side SPA routing
           cp dist/index.html dist/404.html
 
       - name: Setup Pages Infrastructure
