@@ -53,6 +53,9 @@ jobs:
           
           # 6. Duplicate index.html to handle client-side SPA routing
           cp dist/index.html dist/404.html
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
