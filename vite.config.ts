@@ -1,20 +1,27 @@
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+
+// This tiny plugin mocks the Node.js backend requirements
+// so the compiler doesn't crash when building your static client files.
+const mockNodeModules = () => ({
+  name: "mock-node-modules",
+  resolveId(id) {
+    if (id === "node:async_hooks") return "\0node:async_hooks";
+  },
+  load(id) {
+    if (id === "\0node:async_hooks") return "export const AsyncLocalStorage = class {};";
+  }
+});
 
 export default defineConfig({
-  // Force the underlying Nitro engine to build a static site specifically for GitHub Pages
-  nitro: {
-    preset: 'github-pages',
-    prerender: {
-      crawlLinks: true,
-      routes: ['/', '/tennis-court-viewer/'], 
-    },
-  } as any, // <-- This 'as any' silences the TypeScript error!
-  
-  tanstackStart: {
-    ssr: false, // Keep Node.js dependencies out of the client bundle
+  base: "/tennis-court-viewer/", // Tells the bundler we are on GitHub Pages
+  resolve: {
+    alias: {
+      "@": "/src" // Keeps your component imports working
+    }
   },
-  
-  vite: {
-    base: "/tennis-court-viewer/", 
+  plugins: [mockNodeModules()],
+  build: {
+    outDir: "dist", // Standard Vite output folder
+    emptyOutDir: true
   }
 });

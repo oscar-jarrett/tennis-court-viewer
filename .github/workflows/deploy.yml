@@ -32,9 +32,11 @@ jobs:
       - name: Install All Dependencies
         run: npm install
 
-      - name: Build Static Site with Nitro
-        # The '|| true' ignores the irrelevant Phase 2 Node.js server crash
-        run: npm run build || echo "Phase 2 server build failed, but Phase 1 static prerender succeeded! Proceeding..."
+      - name: Build Standard SPA
+        run: |
+          npm run build
+          # Duplicate index.html to handle client-side routing
+          cp dist/index.html dist/404.html
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -42,8 +44,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Grabs the static files that Nitro successfully generated in Phase 1!
-          path: './.output/public' 
+          path: './dist' # Uploading the clean, bundled assets!
 
       - name: Deploy Live Site
         id: deployment
