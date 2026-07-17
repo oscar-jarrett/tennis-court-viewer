@@ -1,0 +1,53 @@
+name: Deploy Full Static SPA to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install All Dependencies
+        run: npm ci
+
+      - name: Build Standalone Static Client Assets
+        run: |
+          npm run build
+          # Copy the compiled HTML shell into dist/client so GitHub Pages finds it
+          cp index.html dist/client/index.html || true
+          # Standard SPA routing fallback strategy for GitHub Pages
+          cp dist/client/index.html dist/client/404.html || true
+
+      - name: Setup Pages Infrastructure
+        uses: actions/configure-pages@v5
+
+      - name: Upload Finished Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist/client'
+
+      - name: Deploy Live Site
+        id: deployment
+        uses: actions/deploy-pages@v4
