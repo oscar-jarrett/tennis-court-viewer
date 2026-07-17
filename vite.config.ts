@@ -1,15 +1,15 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  base: "/tennis-court-viewer/", // Tells the bundler we are on GitHub Pages
-  resolve: {
-    alias: [
-      { find: "@", replacement: "/src" }, // Keeps your component imports working
-      { find: "node:async_hooks", replacement: "/src/mock-async-hooks.js" } // Points to the physical mock file we will create
-    ]
-  },
-  build: {
-    outDir: "dist",
-    emptyOutDir: true
+  // We use the Lovable wrapper so you get all your Tailwind and CSS plugins back!
+  vite: {
+    base: "/tennis-court-viewer/", 
+    resolve: {
+      alias: [
+        { find: "@", replacement: "/src" },
+        // Inject the magic crash-preventer directly into Lovable's pipeline
+        { find: "node:async_hooks", replacement: "/src/mock-async-hooks.js" }
+      ]
+    }
   }
 });
