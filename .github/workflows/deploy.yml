@@ -35,8 +35,8 @@ jobs:
       - name: Build Standalone Static Client Assets
         run: |
           npm run build
-          # Copy the compiled HTML shell to 404.html inside the nested subdirectory
-          cp .output/public/tennis-court-viewer/index.html .output/public/tennis-court-viewer/404.html || true
+          # Copy the flat compiled index.html to 404.html for routing fallbacks
+          cp .output/public/index.html .output/public/404.html || true
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -44,7 +44,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './.output/public/tennis-court-viewer' # <-- Point directly to the nested folder!
+          path: './.output/public' # <-- Point back to the flat public folder
 
       - name: Deploy Live Site
         id: deployment
