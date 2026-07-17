@@ -1,13 +1,25 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  // We use the Lovable wrapper so you get all your Tailwind and CSS plugins back!
+  // Force Nitro to generate the final index.html for GitHub Pages
+  nitro: {
+    preset: 'github-pages',
+    prerender: {
+      crawlLinks: true,
+      routes: ['/', '/tennis-court-viewer/'], 
+    },
+  } as any,
+  
+  tanstackStart: {
+    ssr: false, // Keep Node.js dependencies out of the client bundle
+  },
+  
   vite: {
     base: "/tennis-court-viewer/", 
     resolve: {
       alias: [
         { find: "@", replacement: "/src" },
-        // Inject the magic crash-preventer directly into Lovable's pipeline
+        // Our magic crash-preventer
         { find: "node:async_hooks", replacement: "/src/mock-async-hooks.js" }
       ]
     }
