@@ -1,8 +1,12 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  vite: {
-    base: "/tennis-court-viewer/", // <-- standard Vite settings must be nested inside this block
+  tanstackStart: {
+    prerender: {
+      routes: ["/"], // <-- Instructs the compiler to generate a static index.html at build time
+    },
   },
-  nitro: true 
+  vite: {
+    base: "/tennis-court-viewer/", // <-- Matches your GitHub subfolder path
+  },
 });
