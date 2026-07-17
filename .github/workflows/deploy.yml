@@ -32,28 +32,19 @@ jobs:
       - name: Install All Dependencies
         run: npm install
 
-      - name: Build Styled Lovable App
+      - name: Build Standard SPA with Styles
         run: |
-          # 1. Create the physical mock file to prevent the Rollup crash
+          # 1. Create the physical mock file to prevent Rollup from crashing
           echo "export class AsyncLocalStorage { getStore() { return undefined; } run(store, cb) { return cb(); } }" > src/mock-async-hooks.js
           
-          # 2. HIDE the legacy index.html so it doesn't overwrite Nitro's generated HTML!
-          mv index.html _hidden_index.html.backup || true
+          # 2. Inject your CSS file directly into index.html so Vite processes Tailwind!
+          sed -i 's|</head>|<link rel="stylesheet" href="/src/styles.css" /></head>|' index.html
           
-          # 3. Run the build
-          npm run build || echo "Phase 1 succeeded. Ignoring secondary server build errors..."
+          # 3. Build the pure static client
+          npm run build
           
-          # 4. Restore the file so your repository stays clean
-          mv _hidden_index.html.backup index.html || true
-          
-          # 5. Find the securely generated HTML and set up SPA routing
-          if [ -f ".output/public/index.html" ]; then
-            cp .output/public/index.html .output/public/404.html
-            echo "ARTIFACT_DIR=./.output/public" >> $GITHUB_ENV
-          else
-            echo "❌ Nitro failed to generate the compiled index.html!"
-            exit 1
-          fi
+          # 4. Duplicate index.html to handle client-side SPA routing
+          cp dist/index.html dist/404.html
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -61,7 +52,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ env.ARTIFACT_DIR }}
+          path: './dist' 
 
       - name: Deploy Live Site
         id: deployment

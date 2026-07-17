@@ -1,27 +1,15 @@
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  // Force Nitro to generate the final index.html for GitHub Pages
-  nitro: {
-    preset: 'github-pages',
-    prerender: {
-      crawlLinks: true,
-      routes: ['/', '/tennis-court-viewer/'], 
-    },
-  } as any,
-  
-  tanstackStart: {
-    ssr: false, // Keep Node.js dependencies out of the client bundle
+  base: "/tennis-court-viewer/", 
+  resolve: {
+    alias: [
+      { find: "@", replacement: "/src" },
+      { find: "node:async_hooks", replacement: "/src/mock-async-hooks.js" }
+    ]
   },
-  
-  vite: {
-    base: "/tennis-court-viewer/", 
-    resolve: {
-      alias: [
-        { find: "@", replacement: "/src" },
-        // Our magic crash-preventer
-        { find: "node:async_hooks", replacement: "/src/mock-async-hooks.js" }
-      ]
-    }
+  build: {
+    outDir: "dist",
+    emptyOutDir: true
   }
 });
