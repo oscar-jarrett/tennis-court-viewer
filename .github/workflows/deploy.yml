@@ -32,8 +32,30 @@ jobs:
       - name: Install All Dependencies
         run: npm install
 
-      - name: Build Standalone Static Client Assets
-        run: npm run build
+      - name: Build and Hunt for index.html
+        run: |
+          npm run build
+          
+          echo "--- SEARCHING FOR COMPILED INDEX.HTML ---"
+          # Search inside common build output folders
+          HTML_PATH=$(find ./dist ./.output -name "index.html" 2>/dev/null | head -n 1)
+          
+          if [ -z "$HTML_PATH" ]; then
+            echo "❌ ERROR: Could not find index.html anywhere in the build outputs!"
+            echo "Here is what the compiler actually generated:"
+            ls -laR dist .output 2>/dev/null || true
+            exit 1
+          fi
+          
+          # Extract just the folder path where index.html lives
+          DIR_NAME=$(dirname "$HTML_PATH")
+          echo "✅ Found compiled index.html hiding inside: $DIR_NAME"
+          
+          # Duplicate it to handle SPA fallback routing
+          cp "$DIR_NAME/index.html" "$DIR_NAME/404.html"
+          
+          # Pass this exact directory to the upload step
+          echo "ARTIFACT_DIR=$DIR_NAME" >> $GITHUB_ENV
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -41,8 +63,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Nitro guarantees the static index.html is placed right here:
-          path: './.output/public' 
+          path: ${{ env.ARTIFACT_DIR }} # Uses the exact folder we just found!
 
       - name: Deploy Live Site
         id: deployment
