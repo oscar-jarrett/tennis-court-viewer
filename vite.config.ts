@@ -1,13 +1,20 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  tanstackStart: {
+  // Force the underlying Nitro engine to build a static site specifically for GitHub Pages
+  nitro: {
+    preset: 'github-pages',
     prerender: {
-      routes: ["/"], // Instructs the Nitro crawler to generate a physical index.html
+      crawlLinks: true,
+      routes: ['/', '/tennis-court-viewer/'], 
     },
+  } as any, // <-- This 'as any' silences the TypeScript error!
+  
+  tanstackStart: {
+    ssr: false, // Keep Node.js dependencies out of the client bundle
   },
+  
   vite: {
-    base: "/tennis-court-viewer/", // Prepends your GitHub repository subfolder path
-  },
-  nitro: true // Routes the final static client output to .output/public
+    base: "/tennis-court-viewer/", 
+  }
 });
