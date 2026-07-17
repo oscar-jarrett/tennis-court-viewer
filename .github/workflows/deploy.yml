@@ -35,8 +35,8 @@ jobs:
       - name: Build Standalone Static Client Assets
         run: |
           npm run build
-          # Copy the flat compiled index.html to 404.html for routing fallbacks
-          cp .output/public/index.html .output/public/404.html || true
+          # Copy compiled index to 404 to support clean client-side routing
+          cp dist/client/index.html dist/client/404.html || true
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -44,7 +44,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './.output/public' # <-- Point back to the flat public folder
+          path: './dist/client' # Points cleanly to Vite's standard output folder
 
       - name: Deploy Live Site
         id: deployment
