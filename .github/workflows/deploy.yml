@@ -35,10 +35,10 @@ jobs:
       - name: Build Standalone Static Client Assets
         run: |
           npm run build
-          # Copy the compiled HTML shell into dist/client so GitHub Pages finds it
-          cp index.html dist/client/index.html || true
+          # Copy the compiled HTML shell into the public folder
+          cp index.html .output/public/index.html || true
           # Standard SPA routing fallback strategy for GitHub Pages
-          cp dist/client/index.html dist/client/404.html || true
+          cp .output/public/index.html .output/public/404.html || true
 
       - name: Setup Pages Infrastructure
         uses: actions/configure-pages@v5
@@ -46,7 +46,7 @@ jobs:
       - name: Upload Finished Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist/client'
+          path: './.output/public' # <-- Change this to point to Nitro's static folder
 
       - name: Deploy Live Site
         id: deployment
