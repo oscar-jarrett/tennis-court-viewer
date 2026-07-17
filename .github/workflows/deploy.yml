@@ -35,9 +35,8 @@ jobs:
       - name: Build Standalone Static Client Assets
         run: |
           npm run build
-          # Copy the compiled HTML shell into the public folder
-          cp index.html .output/public/index.html || true
-          # Standard SPA routing fallback strategy for GitHub Pages
+          # DO NOT copy the raw index.html! Nitro already built a compiled one in .output/public.
+          # We only copy the COMPILED index.html to 404.html for routing fallbacks:
           cp .output/public/index.html .output/public/404.html || true
 
       - name: Setup Pages Infrastructure
