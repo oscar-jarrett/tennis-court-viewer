@@ -3,10 +3,11 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
   tanstackStart: {
     prerender: {
-      routes: ["/"], // <-- Instructs the compiler to generate a static index.html at build time
+      routes: ["/"], // Generates a static index.html
     },
   },
   vite: {
-    base: "/tennis-court-viewer/", // <-- Matches your GitHub subfolder path
+    base: "/tennis-court-viewer/", // Prepend GitHub subfolder path
   },
+  nitro: true // <-- MUST be active to output to .output/public!
 });
