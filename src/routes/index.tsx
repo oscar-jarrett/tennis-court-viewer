@@ -26,7 +26,11 @@ function ViewerPage() {
   const [showCableModal, setShowCableModal] = useState(false); // Controls the visibility of the Cable Aggregation Summary table
 
   const [isDark, setIsDark] = useState(() => {
-    return localStorage.getItem("tennis-theme") !== "light";
+    // Safe check to ensure we are in the browser before touching localStorage
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("tennis-theme") !== "light";
+    }
+    return true; // Default to dark mode during the background build process
   });
 
   // --- EFFECTS ---
