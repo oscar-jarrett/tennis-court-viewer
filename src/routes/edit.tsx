@@ -2,10 +2,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Save, ArrowLeft, X, LayoutTemplate, ImagePlus, PenLine, Trash2, PanelLeftClose, PanelLeftOpen, Sun, Moon, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { supabase } from "@/lib/supabase"; // 🔌 THE NEW CONNECTION!
-import type { CameraSlot, FreeObject, Survey } from "./index"; // Using the types we moved to index.tsx
+import { supabase } from "@/lib/supabase"; 
+import type { CameraSlot, FreeObject, Survey } from "./index"; 
 
-// Lazy load the 3D scene (Ensure case matches ViewerScene.tsx)
 const ViewerScene = lazy(() =>
   import("../components/scene/ViewerScene").then((m) => ({ default: m.ViewerScene }))
 );
@@ -14,7 +13,6 @@ export const Route = createFileRoute("/edit")({
   component: EditPage,
 });
 
-// Dropdown options for slot equipment
 const AVAILABLE_MODELS = [
   { name: "Tripod Camera", file: "tripod.glb" },
   { name: "Flatback Camera", file: "flatback.glb" },
@@ -24,7 +22,6 @@ const AVAILABLE_MODELS = [
 function EditPage() {
   const navigate = useNavigate();
   
-  // --- STATE ---
   const [activeSurvey, setActiveSurvey] = useState<Survey | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -37,12 +34,10 @@ function EditPage() {
     return localStorage.getItem("tennis-theme") !== "light";
   });
 
-  // --- EFFECTS ---
   useEffect(() => {
     localStorage.setItem("tennis-theme", isDark ? "dark" : "light");
   }, [isDark]);
 
-  // Load Data from Supabase
   useEffect(() => {
     async function loadSurvey() {
       const activeId = localStorage.getItem("active-survey-id");
@@ -51,7 +46,6 @@ function EditPage() {
         return;
       }
 
-      // Fetch Court, Cameras, and Utilities
       const { data: court } = await supabase.from('courts').select('*').eq('id', activeId).single();
       if (!court) {
         navigate({ to: "/surveys" });
@@ -78,7 +72,6 @@ function EditPage() {
     setDrawingRouteFor(null); 
   }, [selectedId]);
 
-  // --- COMPUTED DATA ---
   const visibleSlots = activeSurvey?.courtType === 'streaming' 
     ? activeSurvey.slots.filter((s: CameraSlot) => s.name === 'Camera 1') 
     : activeSurvey?.slots || [];
@@ -87,11 +80,9 @@ function EditPage() {
   const selectedFreeObj = useMemo(() => activeSurvey?.freeObjects?.find((o: FreeObject) => o.id === selectedId) ?? null, [activeSurvey, selectedId]);
   const activeItem = selectedSlot || selectedFreeObj;
 
-  // --- DATA UPDATE HANDLERS ---
-  
   function updateActiveSurvey(updates: Partial<Survey>) {
     setActiveSurvey((prev: Survey | null) => prev ? { ...prev, ...updates } : null);
-    setIsSaved(false); // Warn user of unsaved changes
+    setIsSaved(false); 
   }
 
   function updateItem(itemId: string, updates: Partial<CameraSlot | FreeObject>) {
@@ -139,7 +130,6 @@ function EditPage() {
     if (type === 'streaming' && selectedId !== 'cam-1' && !selectedFreeObj) setSelectedId(null);
   }
 
-  // Inserts Free Objects directly to the Cloud to get a real UUID
   async function handleAddFreeObject(modelFile: string, name: string) {
     if (!activeSurvey) return;
     
@@ -162,7 +152,6 @@ function EditPage() {
     }
   }
 
-  // Deletes Free Objects directly from the Cloud
   async function handleDeleteFreeObject(id: string) {
     if (!activeSurvey) return;
     
@@ -190,18 +179,15 @@ function EditPage() {
     if (newName) updateActiveSurvey({ name: newName });
   }
 
-  // --- THE CLOUD SAVE ENGINE ---
   async function handleSaveToCloud() {
     if (!activeSurvey) return;
     
     try {
-      // 1. Update Court metadata
       await supabase.from('courts').update({
         name: activeSurvey.name,
         court_type: activeSurvey.courtType
       }).eq('id', activeSurvey.id);
 
-      // 2. Update all Camera Slots
       for (const slot of activeSurvey.slots) {
         await supabase.from('camera_slots').update({
           position_x: slot.position_x,
@@ -218,7 +204,6 @@ function EditPage() {
         }).eq('id', slot.id);
       }
 
-      // 3. Update all Free Objects
       if (activeSurvey.freeObjects) {
         for (const obj of activeSurvey.freeObjects) {
           await supabase.from('free_objects').update({
@@ -246,11 +231,9 @@ function EditPage() {
 
   if (!activeSurvey) return null;
 
-  // --- RENDER ---
   return (
     <div className={`app-shell flex flex-col min-h-screen ${isDark ? 'bg-slate-950 text-slate-200' : 'bg-slate-100 text-slate-900'}`}>
       
-      {/* 1. TOP HEADER (Navigation & Saves) */}
       <header className={`app-header relative z-50 flex items-center justify-between p-4 border-b ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300 shadow-sm'}`}>
         <div className="flex items-center gap-4">
           <button 
@@ -300,7 +283,6 @@ function EditPage() {
 
       <div className="scene-wrap flex flex-1 overflow-hidden relative">
         
-        {/* 2. LEFT SIDEBAR (Selection Menu) */}
         {isSidebarOpen && (
           <div className={`w-64 flex flex-col border-r shrink-0 overflow-hidden relative z-50 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-lg'}`}>
             <div className={`text-xs font-bold uppercase tracking-wider p-4 pb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Camera Slots</div>
@@ -349,7 +331,6 @@ function EditPage() {
         )}
 
         <div className="flex-1 relative min-w-0 h-full overflow-hidden">
-          {/* 3. 3D CANVAS INJECTION */}
           <Suspense fallback={<div className="p-8 font-bold">Loading Assets...</div>}>
             <ViewerScene
               courtType={activeSurvey.courtType}
@@ -367,10 +348,8 @@ function EditPage() {
             />
           </Suspense>
 
-          {/* 4. RIGHT PROPERTIES PANEL */}
           {activeItem && (
             <>
-              {/* Floating button when minimized */}
               {!isInfoPanelOpen && (
                 <button 
                   onClick={() => setIsInfoPanelOpen(true)}
@@ -383,7 +362,6 @@ function EditPage() {
                 </button>
               )}
 
-              {/* Main Panel Content */}
               {isInfoPanelOpen && (
                 <aside className={`absolute top-4 right-4 bottom-4 w-[340px] rounded-xl border p-5 shadow-2xl overflow-y-auto flex flex-col z-50 ${isDark ? 'bg-slate-900/95 border-slate-700 backdrop-blur-md' : 'bg-white/95 border-slate-200 backdrop-blur-md'}`}>
                   
@@ -395,14 +373,12 @@ function EditPage() {
                     </div>
                   </div>
                   
-                  {/* Delete button (only applies to user-spawned utilities, not fixed slots) */}
                   {selectedFreeObj && (
                     <button onClick={() => handleDeleteFreeObject(activeItem.id)} className={`mb-6 text-xs w-fit px-3 py-1.5 rounded font-bold transition flex items-center ${isDark ? 'bg-red-900/40 hover:bg-red-900/60 text-red-400' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}>
                       <Trash2 size={12} className="mr-1.5"/> Delete Utility
                     </button>
                   )}
 
-                  {/* Slot Model Selection */}
                   {selectedSlot && (
                     <div className="mb-5">
                       <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Equipment Model</label>
@@ -419,7 +395,6 @@ function EditPage() {
                     </div>
                   )}
 
-                  {/* Cable Routing & Measurement Interface */}
                   {(selectedSlot || selectedFreeObj?.model_file === 'fibre_box.glb') && (
                     <div className="mb-5 space-y-3">
                       <label className={`block text-xs font-bold uppercase tracking-wider mb-2 border-b pb-1 ${isDark ? 'text-slate-400 border-slate-800' : 'text-slate-500 border-slate-200'}`}>Cable Details</label>
@@ -436,7 +411,6 @@ function EditPage() {
                         )}
                       </div>
                       
-                      {/* Dynamic instruction text based on drawing state */}
                       {drawingRouteFor === activeItem.id ? (
                         <div className="text-[10px] leading-tight text-emerald-400 font-bold animate-pulse">Click anywhere on the 3D court to drop waypoints. Double-click the court to finish.</div>
                       ) : (
@@ -447,53 +421,93 @@ function EditPage() {
                         <div className="pt-2 space-y-3">
                           <div className="flex items-center gap-3">
                             <span className="w-16 text-xs font-bold text-orange-500">SDI</span>
-                            <input type="text" placeholder="e.g. 20m" value={(activeItem as CameraSlot).cable_sdi || ""} onChange={(e) => updateItem(activeItem.id, { cable_sdi: e.target.value })} className={`flex-1 border rounded p-1.5 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
+                            <input 
+                              key={`sdi-${activeItem.id}`}
+                              type="text" 
+                              placeholder="e.g. 20m" 
+                              defaultValue={(activeItem as CameraSlot).cable_sdi || ""} 
+                              onBlur={(e) => updateItem(activeItem.id, { cable_sdi: e.target.value })} 
+                              className={`flex-1 border rounded p-1.5 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                            />
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="w-16 text-xs font-bold text-blue-500">CAT-6</span>
-                            <input type="text" placeholder="e.g. 20m" value={(activeItem as CameraSlot).cable_cat6 || ""} onChange={(e) => updateItem(activeItem.id, { cable_cat6: e.target.value })} className={`flex-1 border rounded p-1.5 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
+                            <input 
+                              key={`cat-${activeItem.id}`}
+                              type="text" 
+                              placeholder="e.g. 20m" 
+                              defaultValue={(activeItem as CameraSlot).cable_cat6 || ""} 
+                              onBlur={(e) => updateItem(activeItem.id, { cable_cat6: e.target.value })} 
+                              className={`flex-1 border rounded p-1.5 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                            />
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="w-16 text-xs font-bold text-green-500">XLR</span>
-                            <input type="text" placeholder="e.g. 10m" value={(activeItem as CameraSlot).cable_xlr || ""} onChange={(e) => updateItem(activeItem.id, { cable_xlr: e.target.value })} className={`flex-1 border rounded p-1.5 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
+                            <input 
+                              key={`xlr-${activeItem.id}`}
+                              type="text" 
+                              placeholder="e.g. 10m" 
+                              defaultValue={(activeItem as CameraSlot).cable_xlr || ""} 
+                              onBlur={(e) => updateItem(activeItem.id, { cable_xlr: e.target.value })} 
+                              className={`flex-1 border rounded p-1.5 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                            />
                           </div>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Fibre Specific Input Fields */}
                   {selectedFreeObj?.model_file === 'fibre_box.glb' && (
                     <div className="mb-5 space-y-3">
                       <label className={`block text-xs font-bold uppercase tracking-wider mb-2 border-b pb-1 ${isDark ? 'text-slate-400 border-slate-800' : 'text-slate-500 border-slate-200'}`}>Fibre Specific Details</label>
                       <div>
                         <span className={`block text-[10px] uppercase mb-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Length</span>
-                        <input type="text" placeholder="e.g. 50m" value={(activeItem as FreeObject).fibre_length || ""} onChange={(e) => updateItem(activeItem.id, { fibre_length: e.target.value })} className={`w-full border rounded p-2 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
+                        <input 
+                          key={`len-${activeItem.id}`}
+                          type="text" 
+                          placeholder="e.g. 50m" 
+                          defaultValue={(activeItem as FreeObject).fibre_length || ""} 
+                          onBlur={(e) => updateItem(activeItem.id, { fibre_length: e.target.value })} 
+                          className={`w-full border rounded p-2 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                        />
                       </div>
                       <div>
                         <span className={`block text-[10px] uppercase mb-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Port Numbers</span>
-                        <input type="text" placeholder="e.g. Ports 1-4" value={(activeItem as FreeObject).fibre_ports || ""} onChange={(e) => updateItem(activeItem.id, { fibre_ports: e.target.value })} className={`w-full border rounded p-2 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
+                        <input 
+                          key={`port-${activeItem.id}`}
+                          type="text" 
+                          placeholder="e.g. Ports 1-4" 
+                          defaultValue={(activeItem as FreeObject).fibre_ports || ""} 
+                          onBlur={(e) => updateItem(activeItem.id, { fibre_ports: e.target.value })} 
+                          className={`w-full border rounded p-2 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                        />
                       </div>
                       <div>
                         <span className={`block text-[10px] uppercase mb-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Reel Serial Number</span>
-                        <input type="text" placeholder="e.g. SN-10294" value={(activeItem as FreeObject).fibre_serial || ""} onChange={(e) => updateItem(activeItem.id, { fibre_serial: e.target.value })} className={`w-full border rounded p-2 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
+                        <input 
+                          key={`serial-${activeItem.id}`}
+                          type="text" 
+                          placeholder="e.g. SN-10294" 
+                          defaultValue={(activeItem as FreeObject).fibre_serial || ""} 
+                          onBlur={(e) => updateItem(activeItem.id, { fibre_serial: e.target.value })} 
+                          className={`w-full border rounded p-2 text-xs outline-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                        />
                       </div>
                     </div>
                   )}
 
-                  {/* Notes Area */}
                   <div className="mb-5">
                     <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Description & Notes</label>
                     <textarea 
+                      key={`desc-${activeItem.id}`}
                       className={`w-full border rounded p-3 text-sm outline-none resize-none ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} 
                       rows={4} 
                       placeholder="Add details here..."
-                      value={activeItem.description || ""} 
-                      onChange={(e) => updateItem(activeItem.id, { description: e.target.value })} 
+                      defaultValue={activeItem.description || ""} 
+                      onBlur={(e) => updateItem(activeItem.id, { description: e.target.value })} 
                     />
                   </div>
 
-                  {/* Photo Upload Grid */}
                   <div className={`mt-auto border-t pt-5 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Reference Photos</label>
