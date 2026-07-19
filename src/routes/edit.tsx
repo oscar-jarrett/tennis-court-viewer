@@ -2,11 +2,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Save, ArrowLeft, X, LayoutTemplate, ImagePlus, PenLine, Trash2, PanelLeftClose, PanelLeftOpen, Sun, Moon, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { type CameraSlot, FreeObject, Survey, StorageData } from "./surveys"; // <-- Removed STORAGE_KEY from here!
+import { supabase } from "@/lib/supabase"; // 🔌 THE NEW CONNECTION!
+import type { CameraSlot, FreeObject, Survey } from "./index"; // Using the types we moved to index.tsx
 
-// Lazy load the 3D scene to keep the main bundle light
+// Lazy load the 3D scene (Ensure case matches ViewerScene.tsx)
 const ViewerScene = lazy(() =>
-  import("@/components/scene/ViewerScene").then((m) => ({ default: m.ViewerScene }))
+  import("../components/scene/ViewerScene").then((m) => ({ default: m.ViewerScene }))
 );
 
 export const Route = createFileRoute("/edit")({
@@ -20,19 +21,17 @@ const AVAILABLE_MODELS = [
   { name: "FR7 PTZ Camera", file: "fr7.glb" }
 ];
 
-const STORAGE_KEY = "tennis-surveys-v20";
-
 function EditPage() {
   const navigate = useNavigate();
   
   // --- STATE ---
-  const [activeSurvey, setActiveSurvey] = useState<Survey | null>(null); // Contains the active DB object
-  const [selectedId, setSelectedId] = useState<string | null>(null);     // ID of the clicked element in the scene
-  const [isSaved, setIsSaved] = useState(false);                         // Triggers the green "Saved!" flash effect
+  const [activeSurvey, setActiveSurvey] = useState<Survey | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
   
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);              // Toggles left menu
-  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(true);          // Toggles right properties panel
-  const [drawingRouteFor, setDrawingRouteFor] = useState<string | null>(null); // Indicates which element is in waypoint drawing mode
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(true);
+  const [drawingRouteFor, setDrawingRouteFor] = useState<string | null>(null);
   
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("tennis-theme") !== "light";
@@ -43,37 +42,45 @@ function EditPage() {
     localStorage.setItem("tennis-theme", isDark ? "dark" : "light");
   }, [isDark]);
 
+  // Load Data from Supabase
   useEffect(() => {
-    const activeId = localStorage.getItem("active-survey-id");
-    const savedData = localStorage.getItem(STORAGE_KEY);
-    
-    // Redirect back to dashboard if we lost data context
-    if (!activeId || !savedData) {
-      navigate({ to: "/surveys" }); 
-      return; 
+    async function loadSurvey() {
+      const activeId = localStorage.getItem("active-survey-id");
+      if (!activeId) {
+        navigate({ to: "/surveys" });
+        return;
+      }
+
+      // Fetch Court, Cameras, and Utilities
+      const { data: court } = await supabase.from('courts').select('*').eq('id', activeId).single();
+      if (!court) {
+        navigate({ to: "/surveys" });
+        return;
+      }
+
+      const { data: slots } = await supabase.from('camera_slots').select('*').eq('court_id', activeId);
+      const { data: freeObjects } = await supabase.from('free_objects').select('*').eq('court_id', activeId);
+
+      setActiveSurvey({
+        id: court.id,
+        name: court.name,
+        courtType: court.court_type,
+        slots: slots || [],
+        freeObjects: freeObjects || []
+      });
     }
 
-    const parsedData: StorageData = JSON.parse(savedData);
-    const found = parsedData.surveys.find((s: Survey) => s.id === activeId);
-    
-    if (found) {
-      setActiveSurvey(found);
-    } else {
-      navigate({ to: "/surveys" });
-    }
+    loadSurvey();
   }, [navigate]);
 
   useEffect(() => {
-    // Automatically re-open the info panel when selecting a new element
     if (selectedId) setIsInfoPanelOpen(true);
-    // Cancel drawing mode if selection changes
     setDrawingRouteFor(null); 
   }, [selectedId]);
 
   // --- COMPUTED DATA ---
-  // If streaming court, only show cam-1. Otherwise, show all.
   const visibleSlots = activeSurvey?.courtType === 'streaming' 
-    ? activeSurvey.slots.filter((s: CameraSlot) => s.id === 'cam-1') 
+    ? activeSurvey.slots.filter((s: CameraSlot) => s.name === 'Camera 1') 
     : activeSurvey?.slots || [];
 
   const selectedSlot = useMemo(() => visibleSlots.find((s: CameraSlot) => s.id === selectedId) ?? null, [visibleSlots, selectedId]);
@@ -82,13 +89,11 @@ function EditPage() {
 
   // --- DATA UPDATE HANDLERS ---
   
-  // High-level update for Survey metadata (like court type or name)
   function updateActiveSurvey(updates: Partial<Survey>) {
     setActiveSurvey((prev: Survey | null) => prev ? { ...prev, ...updates } : null);
-    setIsSaved(false); // Forces the Save button to turn green to warn user of unsaved changes
+    setIsSaved(false); // Warn user of unsaved changes
   }
 
-  // Element-level update (merges changes into the specific camera or utility object)
   function updateItem(itemId: string, updates: Partial<CameraSlot | FreeObject>) {
     if (!activeSurvey) return;
     if (activeSurvey.slots.some((s: CameraSlot) => s.id === itemId)) {
@@ -98,7 +103,6 @@ function EditPage() {
     }
   }
 
-  // Tracks waypoint drags
   function handleUpdateCableNode(itemId: string, nodeIndex: number, pos: [number, number, number]) {
     if (!activeSurvey) return;
     const slot = activeSurvey.slots.find(s => s.id === itemId);
@@ -111,7 +115,6 @@ function EditPage() {
     updateItem(itemId, { cable_nodes: newNodes });
   }
 
-  // Appends a new waypoint from a canvas click
   function handleDrawWaypoint(itemId: string, pos: [number, number, number]) {
     if (!activeSurvey) return;
     const slot = activeSurvey.slots.find(s => s.id === itemId);
@@ -124,35 +127,51 @@ function EditPage() {
     updateItem(itemId, { cable_nodes: newNodes });
   }
 
-  // Swaps stadium GLTF models and repositions Cameras 3/4 based on umpire side
   function handleCourtChange(type: 'left' | 'right' | 'streaming') {
     if (!activeSurvey) return;
     const newSlots = activeSurvey.slots.map((slot: CameraSlot) => {
       const isLeft = type === 'left' || type === 'streaming';
-      if (slot.id === "cam-3") return { ...slot, position_x: isLeft ? 8 : -8, position_z: isLeft ? -11 : 11, rotation_y: isLeft ? Math.PI : 0 };
-      if (slot.id === "cam-4") return { ...slot, position_x: isLeft ? -8 : 8, position_z: isLeft ? -11 : 11, rotation_y: isLeft ? Math.PI : 0 };
+      if (slot.name === "Camera 3") return { ...slot, position_x: isLeft ? 8 : -8, position_z: isLeft ? -11 : 11, rotation_y: isLeft ? Math.PI : 0 };
+      if (slot.name === "Camera 4") return { ...slot, position_x: isLeft ? -8 : 8, position_z: isLeft ? -11 : 11, rotation_y: isLeft ? Math.PI : 0 };
       return slot;
     });
     updateActiveSurvey({ courtType: type, slots: newSlots });
     if (type === 'streaming' && selectedId !== 'cam-1' && !selectedFreeObj) setSelectedId(null);
   }
 
-  // Utility spawning
-  function handleAddFreeObject(modelFile: string, name: string) {
+  // Inserts Free Objects directly to the Cloud to get a real UUID
+  async function handleAddFreeObject(modelFile: string, name: string) {
     if (!activeSurvey) return;
-    const newObj: FreeObject = { id: "free-" + Date.now(), name, model_file: modelFile, position_x: 0, position_y: 0, position_z: 0, rotation_y: 0, photos: [] };
-    updateActiveSurvey({ freeObjects: [...(activeSurvey.freeObjects || []), newObj] });
-    setSelectedId(newObj.id);
+    
+    const { data, error } = await supabase.from('free_objects').insert({
+      court_id: activeSurvey.id,
+      name,
+      model_file: modelFile,
+      position_x: 0, 
+      position_y: 0, 
+      position_z: 0, 
+      rotation_y: 0
+    }).select().single();
+
+    if (data) {
+      updateActiveSurvey({ freeObjects: [...(activeSurvey.freeObjects || []), data] });
+      setSelectedId(data.id);
+    } else {
+      console.error(error);
+      alert("Failed to spawn object in database.");
+    }
   }
 
-  // Utility deletion
-  function handleDeleteFreeObject(id: string) {
+  // Deletes Free Objects directly from the Cloud
+  async function handleDeleteFreeObject(id: string) {
     if (!activeSurvey) return;
+    
+    await supabase.from('free_objects').delete().eq('id', id);
+    
     updateActiveSurvey({ freeObjects: (activeSurvey.freeObjects || []).filter((o: FreeObject) => o.id !== id) });
     if (selectedId === id) setSelectedId(null);
   }
 
-  // Photo to Base64 Image Conversion
   function handlePhotoUpload(slotId: string, file: File) {
     const reader = new FileReader();
     reader.onload = () => activeItem && updateItem(slotId, { photos: [...(activeItem.photos || []), reader.result as string] });
@@ -171,18 +190,57 @@ function EditPage() {
     if (newName) updateActiveSurvey({ name: newName });
   }
 
-  // Commits activeSurvey data back to LocalStorage
-  function handleSaveLocally() {
+  // --- THE CLOUD SAVE ENGINE ---
+  async function handleSaveToCloud() {
     if (!activeSurvey) return;
+    
     try {
-      const savedData = localStorage.getItem(STORAGE_KEY);
-      let parsedData: StorageData = savedData ? JSON.parse(savedData) : { folders: [], surveys: [] };
-      parsedData.surveys = parsedData.surveys.map((s: Survey) => s.id === activeSurvey.id ? activeSurvey : s);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedData));
+      // 1. Update Court metadata
+      await supabase.from('courts').update({
+        name: activeSurvey.name,
+        court_type: activeSurvey.courtType
+      }).eq('id', activeSurvey.id);
+
+      // 2. Update all Camera Slots
+      for (const slot of activeSurvey.slots) {
+        await supabase.from('camera_slots').update({
+          position_x: slot.position_x,
+          position_y: slot.position_y,
+          position_z: slot.position_z,
+          rotation_y: slot.rotation_y,
+          model_file: slot.model_file,
+          description: slot.description,
+          photos: slot.photos,
+          cable_sdi: slot.cable_sdi,
+          cable_cat6: slot.cable_cat6,
+          cable_xlr: slot.cable_xlr,
+          cable_nodes: slot.cable_nodes
+        }).eq('id', slot.id);
+      }
+
+      // 3. Update all Free Objects
+      if (activeSurvey.freeObjects) {
+        for (const obj of activeSurvey.freeObjects) {
+          await supabase.from('free_objects').update({
+            position_x: obj.position_x,
+            position_y: obj.position_y,
+            position_z: obj.position_z,
+            rotation_y: obj.rotation_y,
+            description: obj.description,
+            photos: obj.photos,
+            fibre_length: obj.fibre_length,
+            fibre_ports: obj.fibre_ports,
+            fibre_serial: obj.fibre_serial,
+            cable_nodes: obj.cable_nodes
+          }).eq('id', obj.id);
+        }
+      }
+
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2000);
     } catch (e) {
-      alert("Storage Full! You have uploaded too many photos. Delete some to save.");
+      console.error(e);
+      alert("Error saving to cloud. Please check your connection.");
     }
   }
 
@@ -225,7 +283,7 @@ function EditPage() {
             </select>
           </div>
 
-          <button onClick={handleSaveLocally} className={`flex items-center gap-2 px-4 py-1.5 rounded text-sm font-bold transition ${isSaved ? 'bg-blue-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
+          <button onClick={handleSaveToCloud} className={`flex items-center gap-2 px-4 py-1.5 rounded text-sm font-bold transition ${isSaved ? 'bg-blue-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
             <Save size={14} /> {isSaved ? "Saved!" : "Save Layout"}
           </button>
         </div>
@@ -298,7 +356,7 @@ function EditPage() {
               slots={visibleSlots}
               freeObjects={activeSurvey.freeObjects || []}
               selectedId={selectedId}
-              isEditing={true}      // Turns on dragging events inside the 3D scene
+              isEditing={true}
               isDark={isDark}
               drawingRouteFor={drawingRouteFor}
               onSelect={(id: string | null) => setSelectedId(id)}
