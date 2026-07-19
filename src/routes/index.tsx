@@ -2,16 +2,57 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Settings, X, FolderOpen, PanelLeftClose, PanelLeftOpen, Sun, Moon, PanelRightClose, PanelRightOpen, Cable } from "lucide-react";
-import { STORAGE_KEY, type CameraSlot, FreeObject, Survey, StorageData } from "./surveys";
+import { supabase } from "@/lib/supabase"; // 🔌 THE NEW CONNECTION!
 
-// Lazy loading the WebGL context
+// Lazy loading the WebGL context (Notice the lowercase filename in the path!)
 const ViewerScene = lazy(() =>
-  import("@/components/scene/ViewerScene").then((m) => ({ default: m.ViewerScene }))
+  import("../components/scene/ViewerScene").then((m) => ({ default: m.ViewerScene }))
 );
 
 export const Route = createFileRoute("/")({
   component: ViewerPage,
 });
+
+// --- DATA INTERFACES (Moved here to make the file self-contained) ---
+export interface CameraSlot {
+  id: string;
+  name: string;
+  position_x: number;
+  position_y: number;
+  position_z: number;
+  rotation_y: number;
+  model_file: string | null;
+  description?: string;
+  photos?: string[];
+  cable_sdi?: string;
+  cable_cat6?: string;
+  cable_xlr?: string;
+  cable_nodes?: [number, number, number][];
+}
+
+export interface FreeObject {
+  id: string;
+  name: string;
+  model_file: string;
+  position_x: number;
+  position_y: number;
+  position_z: number;
+  rotation_y: number;
+  description?: string;
+  photos?: string[];
+  fibre_length?: string;
+  fibre_ports?: string;
+  fibre_serial?: string;
+  cable_nodes?: [number, number, number][];
+}
+
+export interface Survey {
+  id: string;
+  name: string;
+  courtType: 'left' | 'right' | 'streaming';
+  slots: CameraSlot[];
+  freeObjects?: FreeObject[];
+}
 
 function ViewerPage() {
   const navigate = useNavigate();
@@ -22,15 +63,13 @@ function ViewerPage() {
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(true);
-  
-  const [showCableModal, setShowCableModal] = useState(false); // Controls the visibility of the Cable Aggregation Summary table
+  const [showCableModal, setShowCableModal] = useState(false);
 
   const [isDark, setIsDark] = useState(() => {
-    // Safe check to ensure we are in the browser before touching localStorage
     if (typeof window !== "undefined") {
       return localStorage.getItem("tennis-theme") !== "light";
     }
-    return true; // Default to dark mode during the background build process
+    return true;
   });
 
   // --- EFFECTS ---
@@ -38,16 +77,30 @@ function ViewerPage() {
     localStorage.setItem("tennis-theme", isDark ? "dark" : "light");
   }, [isDark]);
 
+  // Load the selected survey directly from Supabase
   useEffect(() => {
-    const activeId = localStorage.getItem("active-survey-id");
-    const savedData = localStorage.getItem(STORAGE_KEY);
-    
-    // Mount Data
-    if (activeId && savedData) {
-      const parsedData: StorageData = JSON.parse(savedData);
-      const found = parsedData.surveys.find((s: Survey) => s.id === activeId);
-      if (found) setActiveSurvey(found);
+    async function loadSurvey() {
+      const activeId = localStorage.getItem("active-survey-id");
+      if (!activeId) return;
+
+      // 1. Fetch the Court
+      const { data: court } = await supabase.from('courts').select('*').eq('id', activeId).single();
+      if (!court) return;
+
+      // 2. Fetch the Cameras and Free Objects attached to this court
+      const { data: slots } = await supabase.from('camera_slots').select('*').eq('court_id', activeId);
+      const { data: freeObjects } = await supabase.from('free_objects').select('*').eq('court_id', activeId);
+
+      setActiveSurvey({
+        id: court.id,
+        name: court.name,
+        courtType: court.court_type,
+        slots: slots || [],
+        freeObjects: freeObjects || []
+      });
     }
+    
+    loadSurvey();
   }, []);
 
   useEffect(() => {
@@ -56,14 +109,14 @@ function ViewerPage() {
 
   // --- COMPUTED DATA ---
   const visibleSlots = activeSurvey?.courtType === 'streaming' 
-    ? activeSurvey.slots.filter((s: CameraSlot) => s.id === 'cam-1') 
+    ? activeSurvey.slots.filter((s: CameraSlot) => s.name === 'Camera 1') // Fallback check if ID changes
     : activeSurvey?.slots || [];
 
   const selectedSlot = useMemo(() => visibleSlots.find((s: CameraSlot) => s.id === selectedId) ?? null, [visibleSlots, selectedId]);
   const selectedFreeObj = useMemo(() => activeSurvey?.freeObjects?.find((o: FreeObject) => o.id === selectedId) ?? null, [activeSurvey, selectedId]);
   const activeItem = selectedSlot || selectedFreeObj;
 
-  // Render a fallback layout if no data is found (e.g., direct navigation to / without a selected survey)
+  // Render a fallback layout if no data is found
   if (!activeSurvey) {
     return (
       <div className={`flex flex-col items-center justify-center min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-900'}`}>
@@ -81,11 +134,10 @@ function ViewerPage() {
   return (
     <div className={`app-shell flex flex-col min-h-screen ${isDark ? 'bg-slate-950 text-slate-200' : 'bg-slate-100 text-slate-900'}`}>
       
-      {/* 1. CABLE SUMMARY MODAL (Sits in front of the page at z-100) */}
+      {/* 1. CABLE SUMMARY MODAL */}
       {showCableModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className={`w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            
             <div className={`flex justify-between items-center p-4 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
               <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <Cable size={20} className="text-blue-500" /> Cable Routing Summary
@@ -95,7 +147,6 @@ function ViewerPage() {
               </button>
             </div>
             
-            {/* Table aggregating all entered lengths from slots and free objects */}
             <div className="p-4 overflow-x-auto max-h-[70vh]">
               <table className={`w-full text-left text-sm whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 <thead className={`text-xs uppercase tracking-wider ${isDark ? 'bg-slate-800/50 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
@@ -136,7 +187,6 @@ function ViewerPage() {
                 </tbody>
               </table>
             </div>
-            
           </div>
         </div>
       )}
@@ -158,7 +208,6 @@ function ViewerPage() {
         </div>
         
         <nav className="flex items-center gap-2">
-          {/* Modal Trigger Button */}
           <button 
             onClick={() => setShowCableModal(true)} 
             className={`flex items-center gap-1.5 text-sm font-bold transition mr-2 px-3 py-1.5 rounded-lg ${isDark ? 'text-blue-400 bg-blue-900/20 hover:bg-blue-900/40' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}
@@ -228,7 +277,7 @@ function ViewerPage() {
               slots={visibleSlots}
               freeObjects={activeSurvey.freeObjects || []}
               selectedId={selectedId}
-              isEditing={false} // View Only Context
+              isEditing={false}
               isDark={isDark}
               onSelect={(id: string | null) => setSelectedId(id)}
             />
