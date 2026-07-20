@@ -190,10 +190,40 @@ function EditPage() {
     if (selectedId === id) setSelectedId(null);
   }
 
-  function handlePhotoUpload(slotId: string, file: File) {
-    const reader = new FileReader();
-    reader.onload = () => activeItem && updateItem(slotId, { photos: [...(activeItem.photos || []), reader.result as string] });
-    reader.readAsDataURL(file);
+  async function handlePhotoUpload(slotId: string, file: File) {
+    if (!activeSurvey || !activeItem) return;
+
+    try {
+      // 1. Create a unique file name based on the time
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      // We organize folders in the bucket by the court's ID
+      const filePath = `${activeSurvey.id}/${fileName}`;
+
+      // 2. Upload the physical file directly to the Supabase Storage Bucket
+      const { error: uploadError } = await supabase.storage
+        .from('survey-photos')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error(uploadError);
+        alert("Failed to upload photo to Supabase. Check your console.");
+        return;
+      }
+
+      // 3. Ask Supabase for the short public URL to view the image
+      const { data: { publicUrl } } = supabase.storage
+        .from('survey-photos')
+        .getPublicUrl(filePath);
+
+      // 4. Save ONLY the short URL to our state (NO MORE CRASHES!)
+      updateItem(slotId, { photos: [...(activeItem.photos || []), publicUrl] });
+      
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Something went wrong during the upload.");
+    }
   }
 
   function handleDeletePhoto(slotId: string, photoIndex: number) {
