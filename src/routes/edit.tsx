@@ -1,6 +1,6 @@
 // --- IMPORTS ---
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, lazy, Suspense, useRef } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Save, ArrowLeft, X, LayoutTemplate, ImagePlus, PenLine, Trash2, PanelLeftClose, PanelLeftOpen, Sun, Moon, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { supabase } from "@/lib/supabase"; 
 import type { CameraSlot, FreeObject, Survey } from "./index"; 
@@ -20,10 +20,11 @@ const AVAILABLE_MODELS = [
 ];
 
 // --- LOCALIZED SUB-COMPONENTS TO PREVENT CRASHES ---
-// This keeps typing calculations isolated away from massive image data array strings.
 function LocalTextArea({ label, placeholder, initialValue, onCommit }: { label: string, placeholder: string, initialValue: string, onCommit: (val: string) => void }) {
   const [localVal, setLocalVal] = useState(initialValue);
+  
   useEffect(() => { setLocalVal(initialValue); }, [initialValue]);
+  
   return (
     <div className="mb-5">
       <label className="block text-xs font-bold uppercase tracking-wider mb-2">{label}</label>
@@ -34,6 +35,8 @@ function LocalTextArea({ label, placeholder, initialValue, onCommit }: { label: 
         value={localVal}
         onChange={(e) => setLocalVal(e.target.value)}
         onBlur={() => onCommit(localVal)}
+        onKeyDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       />
     </div>
   );
@@ -41,7 +44,9 @@ function LocalTextArea({ label, placeholder, initialValue, onCommit }: { label: 
 
 function LocalInput({ label, placeholder, initialValue, labelColor = "", onCommit }: { label: string, placeholder: string, initialValue: string, labelColor?: string, onCommit: (val: string) => void }) {
   const [localVal, setLocalVal] = useState(initialValue);
+  
   useEffect(() => { setLocalVal(initialValue); }, [initialValue]);
+  
   return (
     <div className="flex items-center gap-3">
       <span className={`w-16 text-xs font-bold ${labelColor}`}>{label}</span>
@@ -52,6 +57,8 @@ function LocalInput({ label, placeholder, initialValue, labelColor = "", onCommi
         onChange={(e) => setLocalVal(e.target.value)}
         onBlur={() => onCommit(localVal)}
         className="flex-1 border rounded p-1.5 text-xs outline-none bg-transparent" 
+        onKeyDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       />
     </div>
   );
@@ -190,18 +197,15 @@ function EditPage() {
     if (selectedId === id) setSelectedId(null);
   }
 
+  // --- SUPABASE STORAGE PHOTO UPLOAD ---
   async function handlePhotoUpload(slotId: string, file: File) {
     if (!activeSurvey || !activeItem) return;
 
     try {
-      // 1. Create a unique file name based on the time
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
-      // We organize folders in the bucket by the court's ID
       const filePath = `${activeSurvey.id}/${fileName}`;
 
-      // 2. Upload the physical file directly to the Supabase Storage Bucket
       const { error: uploadError } = await supabase.storage
         .from('survey-photos')
         .upload(filePath, file);
@@ -212,12 +216,10 @@ function EditPage() {
         return;
       }
 
-      // 3. Ask Supabase for the short public URL to view the image
       const { data: { publicUrl } } = supabase.storage
         .from('survey-photos')
         .getPublicUrl(filePath);
 
-      // 4. Save ONLY the short URL to our state (NO MORE CRASHES!)
       updateItem(slotId, { photos: [...(activeItem.photos || []), publicUrl] });
       
     } catch (error) {
