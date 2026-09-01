@@ -1,5 +1,5 @@
 // --- IMPORTS ---
-import { Suspense, useRef } from "react";
+import { Suspense, useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Html, TransformControls, CatmullRomLine, Stats } from "@react-three/drei";
 import * as THREE from "three";
@@ -7,12 +7,13 @@ import type { CameraSlot, FreeObject } from "@/routes/index";
 
 // --- CUSTOM MODEL LOADER ---
 function CustomModel({ filename }: { filename: string }) {
-  // Dynamically injects the base URL and the Google Draco Decoder
   const { scene } = useGLTF(
     `${import.meta.env.BASE_URL}models/${filename}`,
     'https://www.gstatic.com/draco/versioned/decoders/1.5.5/'
   );
-  return <primitive object={scene.clone()} />;
+  
+  const clonedScene = useMemo(() => scene.clone(), [scene]);
+  return <primitive object={clonedScene} />;
 }
 
 // --- CAMERA RIG ANIMATOR ---
@@ -24,40 +25,65 @@ function CameraRig({ selectedPos, selectedId }: { selectedPos: THREE.Vector3 | n
   const isZooming = useRef(false);
   const isReturning = useRef(false);
 
+  // We optimize this loop to only wake up the graphics card when the camera is actively flying
   useFrame((state, delta) => {
-    if (controls.current) {
-      if (selectedId !== previousId.current) {
-        previousId.current = selectedId;
-        if (selectedId) {
-          isZooming.current = true;
-          isReturning.current = false;
-        } else {
-          isReturning.current = true;
+    if (!controls.current) return;
+    
+    let needsUpdate = false; 
+
+    if (selectedId !== previousId.current) {
+      previousId.current = selectedId;
+      if (selectedId) {
+        isZooming.current = true;
+        isReturning.current = false;
+      } else {
+        isReturning.current = true;
+        isZooming.current = false;
+      }
+      needsUpdate = true;
+    }
+
+    if (selectedPos) {
+      lookAtPos.current.copy(selectedPos).add(new THREE.Vector3(0, 1.5, 0));
+      
+      if (controls.current.target.distanceTo(lookAtPos.current) > 0.01) {
+        controls.current.target.lerp(lookAtPos.current, 5 * delta);
+        needsUpdate = true;
+      }
+      
+      if (isZooming.current) {
+        targetCamPos.current.copy(selectedPos).add(new THREE.Vector3(5, 8, 6));
+        state.camera.position.lerp(targetCamPos.current, 5 * delta);
+        if (state.camera.position.distanceTo(targetCamPos.current) < 0.2) {
           isZooming.current = false;
+        } else {
+          needsUpdate = true;
         }
       }
-
-      if (selectedPos) {
-        lookAtPos.current.copy(selectedPos).add(new THREE.Vector3(0, 1.5, 0));
+    } 
+    else if (isReturning.current) {
+      lookAtPos.current.set(0, 0, 0); 
+      if (controls.current.target.distanceTo(lookAtPos.current) > 0.01) {
         controls.current.target.lerp(lookAtPos.current, 5 * delta);
-        
-        if (isZooming.current) {
-          targetCamPos.current.copy(selectedPos).add(new THREE.Vector3(5, 8, 6));
-          state.camera.position.lerp(targetCamPos.current, 5 * delta);
-          if (state.camera.position.distanceTo(targetCamPos.current) < 0.2) isZooming.current = false;
-        }
-        controls.current.update();
-      } 
-      else if (isReturning.current) {
-        lookAtPos.current.set(0, 0, 0); 
-        controls.current.target.lerp(lookAtPos.current, 5 * delta);
-        targetCamPos.current.set(40, 30, 40); 
-        state.camera.position.lerp(targetCamPos.current, 5 * delta);
-        if (state.camera.position.distanceTo(targetCamPos.current) < 0.2) isReturning.current = false;
-        controls.current.update();
+        needsUpdate = true;
+      }
+      
+      targetCamPos.current.set(40, 30, 40); 
+      state.camera.position.lerp(targetCamPos.current, 5 * delta);
+      if (state.camera.position.distanceTo(targetCamPos.current) < 0.2) {
+        isReturning.current = false;
+      } else {
+        needsUpdate = true;
       }
     }
+
+    // If the camera moved, tell the Canvas to draw a frame. Otherwise, sleep!
+    if (needsUpdate) {
+      controls.current.update();
+      state.invalidate(); 
+    }
   });
+  
   return <OrbitControls ref={controls} makeDefault />;
 }
 
@@ -103,6 +129,24 @@ export function ViewerScene({
 
   const gigabob = freeObjects.find((o) => o.model_file === 'gigabob.glb');
 
+  const stadiumEventProps = drawingRouteFor ? {
+    onClick: (e: any) => {
+      e.stopPropagation();
+      if (onDrawWaypoint) onDrawWaypoint(drawingRouteFor, [e.point.x, e.point.y + 0.1, e.point.z]);
+    },
+    onDoubleClick: (e: any) => {
+      e.stopPropagation();
+      if (onFinishDrawing) onFinishDrawing();
+    },
+    onPointerOver: (e: any) => {
+      e.stopPropagation();
+      document.body.style.cursor = 'crosshair';
+    },
+    onPointerOut: () => {
+      document.body.style.cursor = 'auto';
+    }
+  } : {};
+
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }} className={isDark ? "bg-slate-950" : "bg-slate-200"}>
       
@@ -114,39 +158,19 @@ export function ViewerScene({
         🔍 Wide View
       </button>
 
-      {/* 2. THE 3D CANVAS */}
-      <Canvas camera={{ position: [40, 30, 40], fov: 45 }} dpr={[1, 1.5]}>
+      {/* CRITICAL FIX: frameloop="demand" puts the 3D engine to sleep when you are typing in the UI */}
+      <Canvas frameloop="demand" camera={{ position: [40, 30, 40], fov: 45 }} dpr={[1, 1.5]}>
         <Stats />
         <ambientLight intensity={isDark ? 0.5 : 0.8} />
         <directionalLight position={[10, 20, 10]} intensity={isDark ? 1 : 1.2} />
         
-        <group
-          onClick={(e: any) => {
-            if (drawingRouteFor && onDrawWaypoint) {
-              e.stopPropagation();
-              onDrawWaypoint(drawingRouteFor, [e.point.x, e.point.y + 0.1, e.point.z]);
-            }
-          }}
-          onDoubleClick={(e: any) => {
-            if (drawingRouteFor && onFinishDrawing) {
-              e.stopPropagation();
-              onFinishDrawing();
-            }
-          }}
-          onPointerOver={(e: any) => {
-            if (drawingRouteFor) {
-              e.stopPropagation();
-              document.body.style.cursor = 'crosshair';
-            }
-          }}
-          onPointerOut={() => document.body.style.cursor = 'auto'}
-        >
+        <group {...stadiumEventProps}>
           <Suspense fallback={null}>
             <CustomModel filename={modelFile} />
           </Suspense>
         </group>
 
-        {/* 3. CAMERA CABLE ROUTING SYSTEM */}
+        {/* CABLE ROUTING SYSTEM */}
         {gigabob && slots.filter(s => s.model_file).map((slot) => {
           const start = new THREE.Vector3(slot.position_x, slot.position_y - 0.5, slot.position_z);
           const end = new THREE.Vector3(gigabob.position_x, gigabob.position_y, gigabob.position_z);
@@ -185,7 +209,7 @@ export function ViewerScene({
           );
         })}
 
-        {/* 4. FIBRE BOX CABLE ROUTING SYSTEM */}
+        {/* FIBRE BOX CABLE ROUTING SYSTEM */}
         {gigabob && freeObjects.filter(o => o.model_file === 'fibre_box.glb').map((fibreBox) => {
           const start = new THREE.Vector3(fibreBox.position_x, fibreBox.position_y, fibreBox.position_z);
           const end = new THREE.Vector3(gigabob.position_x, gigabob.position_y, gigabob.position_z);
@@ -223,7 +247,7 @@ export function ViewerScene({
           );
         })}
 
-        {/* 5. RENDER CAMERA SLOTS */}
+        {/* RENDER CAMERA SLOTS */}
         {slots.map((slot: CameraSlot) => {
           const isSelected = slot.id === selectedId;
           const position = new THREE.Vector3(slot.position_x, slot.position_y, slot.position_z);
@@ -252,7 +276,7 @@ export function ViewerScene({
           );
         })}
 
-        {/* 6. RENDER FREE OBJECTS */}
+        {/* RENDER FREE OBJECTS */}
         {freeObjects.map((obj: FreeObject) => {
           const isSelected = obj.id === selectedId;
           const position: [number, number, number] = [obj.position_x, obj.position_y, obj.position_z];
@@ -287,7 +311,6 @@ export function ViewerScene({
           return <group key={obj.id} position={position}>{content}</group>;
         })}
         
-        {/* 7. INITIALIZE CAMERA RIG */}
         <CameraRig selectedPos={selectedPos} selectedId={selectedId} />
       </Canvas>
     </div>
