@@ -1,6 +1,6 @@
 // --- IMPORTS ---
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, lazy, Suspense, useRef } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Save, ArrowLeft, X, LayoutTemplate, ImagePlus, PenLine, Trash2, PanelLeftClose, PanelLeftOpen, Sun, Moon, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { supabase } from "@/lib/supabase"; 
 import type { CameraSlot, FreeObject, Survey } from "./index"; 
@@ -19,54 +19,43 @@ const AVAILABLE_MODELS = [
   { name: "FR7 PTZ Camera", file: "fr7.glb" }
 ];
 
-// --- UNCONTROLLED SUB-COMPONENTS (GUARANTEED NOT TO FREEZE) ---
+// --- CLEAN, ISOLATED TEXT COMPONENTS ---
+// Because they have their own useState, typing here will NOT wake up the 3D Scene!
 function LocalTextArea({ label, placeholder, initialValue, onCommit }: { label: string, placeholder: string, initialValue: string, onCommit: (val: string) => void }) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [val, setVal] = useState(initialValue || "");
   
-  useEffect(() => { 
-    if (inputRef.current && inputRef.current.value !== (initialValue || "")) {
-      inputRef.current.value = initialValue || ""; 
-    }
-  }, [initialValue]);
+  useEffect(() => { setVal(initialValue || ""); }, [initialValue]);
   
   return (
     <div className="mb-5">
       <label className="block text-xs font-bold uppercase tracking-wider mb-2">{label}</label>
       <textarea 
-        ref={inputRef}
         className="w-full border rounded p-3 text-sm outline-none resize-none bg-transparent"
         rows={4} 
         placeholder={placeholder}
-        defaultValue={initialValue}
-        onBlur={(e) => onCommit(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => onCommit(val)}
       />
     </div>
   );
 }
 
 function LocalInput({ label, placeholder, initialValue, labelColor = "", onCommit }: { label: string, placeholder: string, initialValue: string, labelColor?: string, onCommit: (val: string) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [val, setVal] = useState(initialValue || "");
   
-  useEffect(() => { 
-    if (inputRef.current && inputRef.current.value !== (initialValue || "")) {
-      inputRef.current.value = initialValue || ""; 
-    }
-  }, [initialValue]);
+  useEffect(() => { setVal(initialValue || ""); }, [initialValue]);
   
   return (
     <div className="flex items-center gap-3">
       <span className={`w-16 text-xs font-bold ${labelColor}`}>{label}</span>
       <input 
-        ref={inputRef}
         type="text" 
         placeholder={placeholder} 
-        defaultValue={initialValue}
-        onBlur={(e) => onCommit(e.target.value)}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => onCommit(val)}
         className="flex-1 border rounded p-1.5 text-xs outline-none bg-transparent" 
-        onKeyDown={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
       />
     </div>
   );
@@ -205,7 +194,6 @@ function EditPage() {
     if (selectedId === id) setSelectedId(null);
   }
 
-  // --- SUPABASE STORAGE PHOTO UPLOAD ---
   async function handlePhotoUpload(slotId: string, file: File) {
     if (!activeSurvey || !activeItem) return;
 
