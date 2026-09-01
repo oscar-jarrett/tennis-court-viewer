@@ -1,7 +1,7 @@
 // --- IMPORTS ---
-import { Suspense, useRef, useMemo } from "react"; // <-- Added useMemo
+import { Suspense, useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, useGLTF, Html, TransformControls, CatmullRomLine, Stats } from "@react-three/drei";
+import { OrbitControls, useGLTF, Html, TransformControls, CatmullRomLine } from "@react-three/drei";
 import * as THREE from "three";
 import type { CameraSlot, FreeObject } from "@/routes/index";
 
@@ -12,10 +12,7 @@ function CustomModel({ filename }: { filename: string }) {
     'https://www.gstatic.com/draco/versioned/decoders/1.5.5/'
   );
   
-  // CRITICAL FIX 1: We useMemo here so the massive stadium is only cloned ONCE. 
-  // Before, it was copying millions of polygons on every single keystroke!
   const clonedScene = useMemo(() => scene.clone(), [scene]);
-  
   return <primitive object={clonedScene} />;
 }
 
@@ -28,70 +25,83 @@ function CameraRig({ selectedPos, selectedId }: { selectedPos: THREE.Vector3 | n
   const isZooming = useRef(false);
   const isReturning = useRef(false);
 
+  // CRITICAL FIX: We added strict snapping thresholds so the math actually finishes and the GPU sleeps!
   useFrame((state, delta) => {
-    if (controls.current) {
-      if (selectedId !== previousId.current) {
-        previousId.current = selectedId;
-        if (selectedId) {
-          isZooming.current = true;
-          isReturning.current = false;
+    if (!controls.current) return;
+    
+    let needsUpdate = false; 
+
+    if (selectedId !== previousId.current) {
+      previousId.current = selectedId;
+      if (selectedId) {
+        isZooming.current = true;
+        isReturning.current = false;
+      } else {
+        isReturning.current = true;
+        isZooming.current = false;
+      }
+      needsUpdate = true;
+    }
+
+    if (selectedPos) {
+      lookAtPos.current.copy(selectedPos).add(new THREE.Vector3(0, 1.5, 0));
+      
+      if (controls.current.target.distanceTo(lookAtPos.current) > 0.05) {
+        controls.current.target.lerp(lookAtPos.current, 5 * delta);
+        needsUpdate = true;
+      } else {
+        controls.current.target.copy(lookAtPos.current); // Force snap!
+      }
+      
+      if (isZooming.current) {
+        targetCamPos.current.copy(selectedPos).add(new THREE.Vector3(5, 8, 6));
+        if (state.camera.position.distanceTo(targetCamPos.current) > 0.1) {
+          state.camera.position.lerp(targetCamPos.current, 5 * delta);
+          needsUpdate = true;
         } else {
-          isReturning.current = true;
+          state.camera.position.copy(targetCamPos.current); // Force snap!
           isZooming.current = false;
         }
       }
-
-      if (selectedPos) {
-        lookAtPos.current.copy(selectedPos).add(new THREE.Vector3(0, 1.5, 0));
+    } 
+    else if (isReturning.current) {
+      lookAtPos.current.set(0, 0, 0); 
+      if (controls.current.target.distanceTo(lookAtPos.current) > 0.05) {
         controls.current.target.lerp(lookAtPos.current, 5 * delta);
-        
-        if (isZooming.current) {
-          targetCamPos.current.copy(selectedPos).add(new THREE.Vector3(5, 8, 6));
-          state.camera.position.lerp(targetCamPos.current, 5 * delta);
-          if (state.camera.position.distanceTo(targetCamPos.current) < 0.2) isZooming.current = false;
-        }
-        controls.current.update();
-      } 
-      else if (isReturning.current) {
-        lookAtPos.current.set(0, 0, 0); 
-        controls.current.target.lerp(lookAtPos.current, 5 * delta);
-        targetCamPos.current.set(40, 30, 40); 
+        needsUpdate = true;
+      } else {
+        controls.current.target.copy(lookAtPos.current); // Force snap!
+      }
+      
+      targetCamPos.current.set(40, 30, 40); 
+      if (state.camera.position.distanceTo(targetCamPos.current) > 0.1) {
         state.camera.position.lerp(targetCamPos.current, 5 * delta);
-        if (state.camera.position.distanceTo(targetCamPos.current) < 0.2) isReturning.current = false;
-        controls.current.update();
+        needsUpdate = true;
+      } else {
+        state.camera.position.copy(targetCamPos.current); // Force snap!
+        isReturning.current = false;
       }
     }
+
+    if (needsUpdate) {
+      controls.current.update();
+      state.invalidate(); 
+    }
   });
+  
   return <OrbitControls ref={controls} makeDefault />;
 }
 
 // --- MAIN VIEWER COMPONENT ---
 export function ViewerScene({ 
-  courtType, 
-  slots, 
-  freeObjects = [],
-  selectedId, 
-  isEditing = false,
-  isDark = true,
-  drawingRouteFor,
-  onSelect,
-  onUpdateFreeObject,
-  onUpdateCableNode,
-  onDrawWaypoint,
-  onFinishDrawing
+  courtType, slots, freeObjects = [], selectedId, isEditing = false, isDark = true, drawingRouteFor,
+  onSelect, onUpdateFreeObject, onUpdateCableNode, onDrawWaypoint, onFinishDrawing
 }: { 
-  courtType: 'left' | 'right' | 'streaming', 
-  slots: CameraSlot[], 
-  freeObjects?: FreeObject[],
-  selectedId: string | null, 
-  isEditing?: boolean,
-  isDark?: boolean,
-  drawingRouteFor?: string | null,
-  onSelect: (id: string | null) => void,
-  onUpdateFreeObject?: (id: string, pos: [number, number, number]) => void,
+  courtType: 'left' | 'right' | 'streaming', slots: CameraSlot[], freeObjects?: FreeObject[],
+  selectedId: string | null, isEditing?: boolean, isDark?: boolean, drawingRouteFor?: string | null,
+  onSelect: (id: string | null) => void, onUpdateFreeObject?: (id: string, pos: [number, number, number]) => void,
   onUpdateCableNode?: (itemId: string, nodeIndex: number, pos: [number, number, number]) => void,
-  onDrawWaypoint?: (id: string, pos: [number, number, number]) => void,
-  onFinishDrawing?: () => void
+  onDrawWaypoint?: (id: string, pos: [number, number, number]) => void, onFinishDrawing?: () => void
 }) {
   
   const selectedSlot = slots.find((s: CameraSlot) => s.id === selectedId);
@@ -107,51 +117,30 @@ export function ViewerScene({
 
   const gigabob = freeObjects.find((o) => o.model_file === 'gigabob.glb');
 
-  // CRITICAL FIX 2: We only attach heavy 3D click listeners to the stadium when you click "Draw Route".
-  // Otherwise, the 3D raycaster ignores the stadium completely, skyrocketing your performance.
   const stadiumEventProps = drawingRouteFor ? {
-    onClick: (e: any) => {
-      e.stopPropagation();
-      if (onDrawWaypoint) onDrawWaypoint(drawingRouteFor, [e.point.x, e.point.y + 0.1, e.point.z]);
-    },
-    onDoubleClick: (e: any) => {
-      e.stopPropagation();
-      if (onFinishDrawing) onFinishDrawing();
-    },
-    onPointerOver: (e: any) => {
-      e.stopPropagation();
-      document.body.style.cursor = 'crosshair';
-    },
-    onPointerOut: () => {
-      document.body.style.cursor = 'auto';
-    }
+    onClick: (e: any) => { e.stopPropagation(); if (onDrawWaypoint) onDrawWaypoint(drawingRouteFor, [e.point.x, e.point.y + 0.1, e.point.z]); },
+    onDoubleClick: (e: any) => { e.stopPropagation(); if (onFinishDrawing) onFinishDrawing(); },
+    onPointerOver: (e: any) => { e.stopPropagation(); document.body.style.cursor = 'crosshair'; },
+    onPointerOut: () => { document.body.style.cursor = 'auto'; }
   } : {};
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }} className={isDark ? "bg-slate-950" : "bg-slate-200"}>
-      
-      <button 
-        onClick={() => onSelect(null)}
-        className={`absolute top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-xl font-bold text-sm transition border
-          ${isDark ? 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border-slate-600' : 'bg-white/90 hover:bg-slate-50 text-slate-800 border-slate-300'}`}
-      >
+      <button onClick={() => onSelect(null)} className={`absolute top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-xl font-bold text-sm transition border ${isDark ? 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border-slate-600' : 'bg-white/90 hover:bg-slate-50 text-slate-800 border-slate-300'}`}>
         🔍 Wide View
       </button>
 
-      {/* 2. THE 3D CANVAS */}
-      <Canvas camera={{ position: [40, 30, 40], fov: 45 }} dpr={[1, 1.5]}>
-        <Stats />
+      <Canvas frameloop="demand" camera={{ position: [40, 30, 40], fov: 45 }} dpr={[1, 1.5]}>
         <ambientLight intensity={isDark ? 0.5 : 0.8} />
         <directionalLight position={[10, 20, 10]} intensity={isDark ? 1 : 1.2} />
         
-        {/* Pass the dynamic props here */}
         <group {...stadiumEventProps}>
           <Suspense fallback={null}>
             <CustomModel filename={modelFile} />
           </Suspense>
         </group>
 
-        {/* 3. CAMERA CABLE ROUTING SYSTEM */}
+        {/* CABLE ROUTING SYSTEM */}
         {gigabob && slots.filter(s => s.model_file).map((slot) => {
           const start = new THREE.Vector3(slot.position_x, slot.position_y - 0.5, slot.position_z);
           const end = new THREE.Vector3(gigabob.position_x, gigabob.position_y, gigabob.position_z);
@@ -166,17 +155,7 @@ export function ViewerScene({
 
           const isDrawing = drawingRouteFor === slot.id;
           const renderNodes = isEditing && selectedId === slot.id && !isDrawing && slot.cable_nodes?.map((node, i) => (
-             <TransformControls
-                key={`node-${slot.id}-${i}`}
-                mode="translate"
-                position={new THREE.Vector3(node[0], node[1], node[2])}
-                onMouseUp={(e: any) => {
-                  if (e?.target?.object && onUpdateCableNode) {
-                    const pos = e.target.object.position;
-                    onUpdateCableNode(slot.id, i, [pos.x, pos.y, pos.z]);
-                  }
-                }}
-             >
+             <TransformControls key={`node-${slot.id}-${i}`} mode="translate" position={new THREE.Vector3(node[0], node[1], node[2])} onMouseUp={(e: any) => { if (e?.target?.object && onUpdateCableNode) { const pos = e.target.object.position; onUpdateCableNode(slot.id, i, [pos.x, pos.y, pos.z]); } }}>
                 <mesh><sphereGeometry args={[0.3, 16, 16]} /><meshStandardMaterial color="yellow" emissive="yellow" /></mesh>
              </TransformControls>
           ));
@@ -190,7 +169,7 @@ export function ViewerScene({
           );
         })}
 
-        {/* 4. FIBRE BOX CABLE ROUTING SYSTEM */}
+        {/* FIBRE BOX CABLE ROUTING SYSTEM */}
         {gigabob && freeObjects.filter(o => o.model_file === 'fibre_box.glb').map((fibreBox) => {
           const start = new THREE.Vector3(fibreBox.position_x, fibreBox.position_y, fibreBox.position_z);
           const end = new THREE.Vector3(gigabob.position_x, gigabob.position_y, gigabob.position_z);
@@ -205,17 +184,7 @@ export function ViewerScene({
 
           const isDrawing = drawingRouteFor === fibreBox.id;
           const renderNodes = isEditing && selectedId === fibreBox.id && !isDrawing && fibreBox.cable_nodes?.map((node, i) => (
-             <TransformControls
-                key={`node-${fibreBox.id}-${i}`}
-                mode="translate"
-                position={new THREE.Vector3(node[0], node[1], node[2])}
-                onMouseUp={(e: any) => {
-                  if (e?.target?.object && onUpdateCableNode) {
-                    const pos = e.target.object.position;
-                    onUpdateCableNode(fibreBox.id, i, [pos.x, pos.y, pos.z]);
-                  }
-                }}
-             >
+             <TransformControls key={`node-${fibreBox.id}-${i}`} mode="translate" position={new THREE.Vector3(node[0], node[1], node[2])} onMouseUp={(e: any) => { if (e?.target?.object && onUpdateCableNode) { const pos = e.target.object.position; onUpdateCableNode(fibreBox.id, i, [pos.x, pos.y, pos.z]); } }}>
                 <mesh><sphereGeometry args={[0.3, 16, 16]} /><meshStandardMaterial color="yellow" emissive="yellow" /></mesh>
              </TransformControls>
           ));
@@ -228,7 +197,7 @@ export function ViewerScene({
           );
         })}
 
-        {/* 5. RENDER CAMERA SLOTS */}
+        {/* RENDER CAMERA SLOTS */}
         {slots.map((slot: CameraSlot) => {
           const isSelected = slot.id === selectedId;
           const position = new THREE.Vector3(slot.position_x, slot.position_y, slot.position_z);
@@ -257,7 +226,7 @@ export function ViewerScene({
           );
         })}
 
-        {/* 6. RENDER FREE OBJECTS */}
+        {/* RENDER FREE OBJECTS */}
         {freeObjects.map((obj: FreeObject) => {
           const isSelected = obj.id === selectedId;
           const position: [number, number, number] = [obj.position_x, obj.position_y, obj.position_z];
@@ -282,17 +251,14 @@ export function ViewerScene({
                     const pos = e.target.object.position;
                     onUpdateFreeObject(obj.id, [pos.x, pos.y, pos.z]);
                   }
-                }}
-              >
+                }}>
                 {content}
               </TransformControls>
             );
           }
-
           return <group key={obj.id} position={position}>{content}</group>;
         })}
         
-        {/* 7. INITIALIZE CAMERA RIG */}
         <CameraRig selectedPos={selectedPos} selectedId={selectedId} />
       </Canvas>
     </div>

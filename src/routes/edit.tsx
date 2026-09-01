@@ -23,7 +23,6 @@ const AVAILABLE_MODELS = [
 function LocalTextArea({ label, placeholder, initialValue, onCommit }: { label: string, placeholder: string, initialValue: string, onCommit: (val: string) => void }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   
-  // Only update the DOM if the database value actually changes from the outside
   useEffect(() => { 
     if (inputRef.current && inputRef.current.value !== (initialValue || "")) {
       inputRef.current.value = initialValue || ""; 
@@ -371,7 +370,17 @@ function EditPage() {
               )}
 
               {isInfoPanelOpen && (
-                <aside className="absolute top-4 right-4 bottom-4 w-[340px] rounded-xl border p-5 shadow-2xl overflow-y-auto flex flex-col z-50 bg-slate-900/95 border-slate-700 backdrop-blur-md">
+                <aside 
+                  className="absolute top-4 right-4 bottom-4 w-[340px] rounded-xl border p-5 shadow-2xl overflow-y-auto flex flex-col z-50 bg-slate-900/95 border-slate-700 backdrop-blur-md"
+                  // TITANIUM WALL: Blocks React Three Fiber from stealing input events
+                  onPointerDown={(e) => e.nativeEvent.stopImmediatePropagation()}
+                  onPointerMove={(e) => e.nativeEvent.stopImmediatePropagation()}
+                  onPointerUp={(e) => e.nativeEvent.stopImmediatePropagation()}
+                  onWheel={(e) => e.nativeEvent.stopImmediatePropagation()}
+                  onKeyDown={(e) => e.nativeEvent.stopImmediatePropagation()}
+                  onKeyUp={(e) => e.nativeEvent.stopImmediatePropagation()}
+                  onClick={(e) => e.nativeEvent.stopImmediatePropagation()}
+                >
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg font-bold">{activeItem.name}</h2>
                     <div className="flex items-center gap-1 -mr-2">
