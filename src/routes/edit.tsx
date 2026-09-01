@@ -20,7 +20,6 @@ const AVAILABLE_MODELS = [
 ];
 
 // --- CLEAN, ISOLATED TEXT COMPONENTS ---
-// Because they have their own useState, typing here will NOT wake up the 3D Scene!
 function LocalTextArea({ label, placeholder, initialValue, onCommit }: { label: string, placeholder: string, initialValue: string, onCommit: (val: string) => void }) {
   const [val, setVal] = useState(initialValue || "");
   
@@ -305,7 +304,13 @@ function EditPage() {
 
       <div className="scene-wrap flex flex-1 overflow-hidden relative">
         {isSidebarOpen && (
-          <div className={`w-64 flex flex-col border-r shrink-0 overflow-hidden relative z-50 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-lg'}`}>
+          <div 
+            className={`w-64 flex flex-col border-r shrink-0 overflow-hidden relative z-50 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-lg'}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+          >
             <div className="text-xs font-bold uppercase tracking-wider p-4 pb-2">Camera Slots</div>
             <div className="overflow-y-auto max-h-[40%]">
               <ul className="p-2 space-y-1">
@@ -360,14 +365,13 @@ function EditPage() {
               {isInfoPanelOpen && (
                 <aside 
                   className="absolute top-4 right-4 bottom-4 w-[340px] rounded-xl border p-5 shadow-2xl overflow-y-auto flex flex-col z-50 bg-slate-900/95 border-slate-700 backdrop-blur-md"
-                  // TITANIUM WALL: Blocks React Three Fiber from stealing input events
-                  onPointerDown={(e) => e.nativeEvent.stopImmediatePropagation()}
-                  onPointerMove={(e) => e.nativeEvent.stopImmediatePropagation()}
-                  onPointerUp={(e) => e.nativeEvent.stopImmediatePropagation()}
-                  onWheel={(e) => e.nativeEvent.stopImmediatePropagation()}
-                  onKeyDown={(e) => e.nativeEvent.stopImmediatePropagation()}
-                  onKeyUp={(e) => e.nativeEvent.stopImmediatePropagation()}
-                  onClick={(e) => e.nativeEvent.stopImmediatePropagation()}
+                  // THE CORRECT SHIELD: Blocks React Three Fiber raycasts without breaking browser focus!
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  onPointerMove={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  onKeyUp={(e) => e.stopPropagation()}
                 >
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg font-bold">{activeItem.name}</h2>
